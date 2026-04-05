@@ -4,12 +4,16 @@
       <el-col :span="20">
         <div class="search">
 
-          <el-select size="large" class="search-select" v-model="searchEngineAddress" placeholder="Select" style="width: 8em">
-            <el-option v-for="item in options" :key="item.id" :label="item.label" :value="item.value" />
-          </el-select>
+
 
           <el-input size="large" v-model="searchContent" v-on:keyup.enter="handleSearch" class="search-input"
             placeholder="请输入搜索内容">
+            <template #prepend>
+              <el-select size="large" class="search-select" v-model="searchEngineAddress" placeholder="Select"
+                style="width: 8em">
+                <el-option v-for="item in options" :key="item.id" :label="item.label" :value="item.value" />
+              </el-select>
+            </template>
             <template #append>
               <el-button :icon="Search" @click="handleSearch" />
             </template>
@@ -75,7 +79,7 @@ onMounted(() => {
   width: 100%;
 }
 
-.select {
-  border-right: 0;
+.search .el-select__wrapper {
+  border: 0 !important;
 }
 </style>

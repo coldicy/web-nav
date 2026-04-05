@@ -3,12 +3,12 @@
     <div class="item" @click="handleOpenUrl" @contextmenu="handleContextmenu">
       <div class="icon">
         <div class="icon-img">
-          <img v-show="imgShow" :src="props.icon">
+          <img v-show="imgShow" :src="props.icon" alt="hehe">
           <div class="icon-alt"><span>{{ iconAlt }}</span></div>
         </div>
       </div>
       <div class="title row_two">
-        {{ props.title + ' ' + props.id }}
+        {{ props.title }}
       </div>
     </div>
   </div>
@@ -40,7 +40,7 @@ const props = defineProps({
 
 const iconAlt = computed(() => {
   if (!props.icon || props.icon.toString().trim() === '') {
-    return props.title.substring(0, 1)
+    return props.title ? props.title.substring(0, 1) : '!!!'
   }
   return ''
 })

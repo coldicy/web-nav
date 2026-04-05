@@ -45,7 +45,7 @@ import NavGroups from "./views/main/NavGroups.vue";
 @media (min-width: 1000px) {
   .body {
     font-size: 16px;
-    width: 48em;
+    width: 60em;
   }
 }
 </style>

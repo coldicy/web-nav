@@ -1,13 +1,10 @@
 <template>
   <div class="container">
-    {{ navItemList }}
-    <ElDivider />
-    {{ navMap }}
-    <div v-for="category in categories">
-      {{ category }}
+    <div v-for="category in categoriesAndUnGrouped">
+      <span class="groupName">{{ category }}</span>
       <!-- https://sortablejs.github.io/vue.draggable.next/#/two-lists -->
-      <draggable class="navs" :list="navMap[category]" group="people" item-key="id" animation="300" ghost-class="ghost-class"
-        chosen-class="chosen-class" @end="onDragEnd">
+      <draggable class="navs" :list="navMap[category]" group="people" item-key="id" animation="300"
+        ghost-class="ghost-class" chosen-class="chosen-class" @end="onDragEnd">
 
         <template #item="{ element, index }">
           <div>
@@ -15,31 +12,20 @@
               @openOptionList="handleOpenOptionList" />
             <!-- {{ index }} -->
           </div>
-
         </template>
-
-
       </draggable>
     </div>
-
-
-    <draggable ref=" refNavs" class="navs" v-model="navItemList" item-key="id" animation="300" ghost-class="ghost-class"
-      chosen-class="chosen-class" @end="onDragEnd">
-      <template #item="{ element }">
-        <NavItem :id="element.id" :title="element.title" :url="element.url" :icon="element.icon"
-          @openOptionList="handleOpenOptionList" />
-      </template>
-    </draggable>
-
 
     <OptionList v-if="optionListState.visible" :positionx="optionListState.positionx"
       :positiony="optionListState.positiony" @optionList_open="handle_optionList_open"
       @optionList_edit="handle_optionList_edit" @optionList_delete="handle_optionList_delete"></OptionList>
 
     <EditPanel v-if="editPanelState.visible" @close-edit-panel="handle_editPanel_close"
-      @saveNavItem="handle_editPanel_save" :url="editPanelState.currentNavItem.url"
-      :title="editPanelState.currentNavItem.title" :icon="editPanelState.currentNavItem.icon"
-      :category="editPanelState.currentNavItem.category" :action="editPanelState.action" :categories="categories">
+      @saveNavItem="handle_editPanel_save" @addNewCategory="handle_editPanel_addCategory"
+      :url="editPanelState.currentNavItem.url" :title="editPanelState.currentNavItem.title"
+      :icon="editPanelState.currentNavItem.icon" :category="editPanelState.currentNavItem.category"
+      :un-grouped-category="unGroupedCategory"
+      :action="editPanelState.action" :categories="categories">
     </EditPanel>
 
     <FixedButtons @addNavItem="handle_fixedButtons_add"></FixedButtons>
@@ -51,7 +37,7 @@ import NavItem from '@/components/NavItem.vue';
 import OptionList from './OptionList.vue';
 import EditPanel from './EditPanel.vue';
 import FixedButtons from '../common/FixedButtons.vue';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import idUtil from '@/assets/js/idUtil';
 import draggable from 'vuedraggable'
 
@@ -61,6 +47,17 @@ const onDragEnd = (evt) => {
   // 这里可以调用 API 保存新的排序
   const newNavs = []
   Object.entries(navMap.value).forEach(([key, value]) => {
+    //如果是没有category的navItem所在的默认分组
+    if (key === unGroupedCategory) {
+      value.some((nav) => {
+        if (nav.category) {
+          nav.category = ''
+          return true
+        }
+      })
+      newNavs.push(...value)
+      return
+    }
     //key对应category value是一个数组，其中的item是属于这个分类下的navItem对象
     value.some((nav) => {
       if (nav.category !== key) {
@@ -72,7 +69,7 @@ const onDragEnd = (evt) => {
   })
   navItemList.value = newNavs
   saveAll()
-
+  initNavMap()
 }
 //这是组件实例，而不是dom实例，因为这是个组件，要获取其中的Dom元素应该refNavs.value.$el
 const refNavs = ref(null)
@@ -99,6 +96,24 @@ const editPanelState = ref({
 const navItemList = ref([])
 //categories
 const categories = ref([])
+//未分组的item 默认分类到 组名为
+const unGroupedCategory = '默认'
+const categoriesAndUnGrouped = computed(() => {
+  let hasUnGrouped = navItemList.value.some((nav) => {
+    if (!nav.category) {
+      return true
+    } else {
+      return false
+    }
+  })
+  let res;
+  if (!hasUnGrouped) {
+    res = [...categories.value]
+  } else {
+    res = [...categories.value, unGroupedCategory]
+  }
+  return res
+})
 //navMap
 const navMap = ref({})
 //初始化数据
@@ -125,20 +140,54 @@ const initCategories = () => {
       saveCategories()
     }
   } catch (e) {
-    console.error('加载categories失败 e is: ', e)
+    console.error('加载categories失败,恢复默认分类 e is: ', e)
+    categories.value = getDefaultCategories()
+    saveCategories()
   }
 }
 
 //按category 初始化 navMap
 const initNavMap = () => {
+  console.log('initNavMap(): categories is', categories.value)
+
+  //根据 分类列表 来分组navItemList
+  const willBeDeleteCategories = []
   categories.value.forEach((category, index) => {
+    console.log('category is', category)
     navMap.value[category] = navItemList.value.filter((nav) => {
       if (nav.category) {
         return nav.category === category
       }
       return false
     })
+    console.log("initNavMap(): navMap.value[category] is", category, navMap.value[category].length)
+
+    //如果某个分类下没有navItem，则从navMap中删除这个分组，同时从分类列表中删除这个分类
+    if ((navMap.value[category].length === 0)) {
+      console.log('0')
+      delete navMap.value[category]
+      willBeDeleteCategories.push(category)
+      console.log(navMap.value)
+    }
   })
+
+  //没有分组的 默认分到未分类
+  navMap.value[unGroupedCategory] = navItemList.value.filter((nav) => {
+    if (nav.category) {
+      return false
+    } else {
+      return true
+    }
+  })
+
+  console.log('willbedeleteCategory is: ', willBeDeleteCategories)
+  categories.value = categories.value.filter((item) => {
+    //返回不在willBeDeleteCategories列表中的item
+    return !willBeDeleteCategories.some((beDelete) => {
+      return beDelete === item
+    })
+  })
+  saveCategories()
 }
 
 
@@ -152,6 +201,13 @@ const loadCategories = () => {
 }
 
 const saveCategories = () => {
+  //去掉 空字符串 null undefine
+  categories.value = categories.value.filter((item) => {
+    return item
+  })
+  //去重
+  categories.value = [...new Set(categories.value)]
+  //持久化
   localStorage.setItem('categories', JSON.stringify(categories.value))
 }
 
@@ -257,6 +313,7 @@ const handle_optionList_delete = () => {
   })
   //删除数据后 保存
   saveNavs()
+  initNavMap()
   closeOptionList()
 }
 
@@ -274,7 +331,16 @@ const handle_editPanel_save = (formData) => {
     editPanelState.value.currentNavItem.id = idUtil.createRandomId()
     navItemList.value.push(editPanelState.value.currentNavItem)
   }
+  console.log('handle_editPanel_save(): ', categories.value)
   saveNavs()
+  
+  initNavMap()
+}
+// 保存新分类
+const handle_editPanel_addCategory = (category) => {
+  console.log('handle_editPanel_addCategory(): ', category)
+  categories.value.push(category)
+  saveCategories()
 }
 
 //<-- 处理 fixedButton 发来的事件
@@ -307,6 +373,13 @@ onUnmounted(() => {
   align-content: flex-start;
   flex-wrap: wrap;
 
+}
+
+.groupName {
+  display: inline-block;
+  margin-top: 2em;
+  padding-left: 0em;
+  color: #333;
 }
 
 .navs span {
