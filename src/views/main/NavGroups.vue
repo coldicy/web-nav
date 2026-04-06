@@ -1,9 +1,31 @@
 <template>
   <div class="container">
-    <div v-for="category in categoriesAndUnGrouped">
-      <span class="groupName">{{ category }}</span>
-      <!-- https://sortablejs.github.io/vue.draggable.next/#/two-lists -->
-      <draggable class="navs" :list="navMap[category]" group="people" item-key="id" animation="300"
+    <!-- 外层draggable 控制分类顺序 -->
+    <draggable :list="categories" item-key="name" animation="300" ghost-class="ghost" chosen-class="chosen"
+      @end="onCategoryDragEnd">
+      <template #item="{ element: category }">
+        <div class="inline-draggable">
+          <span class="groupName">{{ category }}</span>
+          <!-- 内层draggable -->
+          <draggable class="navs" :list="navMap[category]" group="people" item-key="id" animation="300"
+            ghost-class="ghost-class" chosen-class="chosen-class" @end="onDragEnd">
+
+            <template #item="{ element, index }">
+              <div>
+                <NavItem :id="element.id" :title="element.title" :url="element.url" :icon="element.icon"
+                  @openOptionList="handleOpenOptionList" />
+                <!-- {{ index }} -->
+              </div>
+            </template>
+          </draggable>
+        </div>
+      </template>
+    </draggable>
+
+    <div class="inline-draggable" v-show="categoriesAndUnGrouped">
+      <span class="groupName">{{ unGroupedCategory }}</span>
+      <!-- 内层draggable -->
+      <draggable class="navs" :list="navMap[unGroupedCategory]" group="people" item-key="id" animation="300"
         ghost-class="ghost-class" chosen-class="chosen-class" @end="onDragEnd">
 
         <template #item="{ element, index }">
@@ -16,6 +38,8 @@
       </draggable>
     </div>
 
+
+
     <OptionList v-if="optionListState.visible" :positionx="optionListState.positionx"
       :positiony="optionListState.positiony" @optionList_open="handle_optionList_open"
       @optionList_edit="handle_optionList_edit" @optionList_delete="handle_optionList_delete"></OptionList>
@@ -24,8 +48,7 @@
       @saveNavItem="handle_editPanel_save" @addNewCategory="handle_editPanel_addCategory"
       :url="editPanelState.currentNavItem.url" :title="editPanelState.currentNavItem.title"
       :icon="editPanelState.currentNavItem.icon" :category="editPanelState.currentNavItem.category"
-      :un-grouped-category="unGroupedCategory"
-      :action="editPanelState.action" :categories="categories">
+      :un-grouped-category="unGroupedCategory" :action="editPanelState.action" :categories="categories">
     </EditPanel>
 
     <FixedButtons @addNavItem="handle_fixedButtons_add"></FixedButtons>
@@ -41,6 +64,10 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import idUtil from '@/assets/js/idUtil';
 import draggable from 'vuedraggable'
 
+//组与组之间的拖拽完毕之后
+const onCategoryDragEnd = () => {
+  saveCategories()
+}
 //vuedraggable
 const onDragEnd = (evt) => {
   console.log('拖拽结束，新顺序:', navItemList.value)
@@ -98,6 +125,7 @@ const navItemList = ref([])
 const categories = ref([])
 //未分组的item 默认分类到 组名为
 const unGroupedCategory = '默认'
+//如果有未分类 navitem 就返回true
 const categoriesAndUnGrouped = computed(() => {
   let hasUnGrouped = navItemList.value.some((nav) => {
     if (!nav.category) {
@@ -108,9 +136,9 @@ const categoriesAndUnGrouped = computed(() => {
   })
   let res;
   if (!hasUnGrouped) {
-    res = [...categories.value]
+    res = false
   } else {
-    res = [...categories.value, unGroupedCategory]
+    res = true
   }
   return res
 })
@@ -333,7 +361,7 @@ const handle_editPanel_save = (formData) => {
   }
   console.log('handle_editPanel_save(): ', categories.value)
   saveNavs()
-  
+
   initNavMap()
 }
 // 保存新分类
